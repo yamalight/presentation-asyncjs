@@ -1,0 +1,892 @@
+<!--
+Partially based on http://github.io/eamodeorubio/tamingasync/
+-->
+
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+
+  <title>Asynchronous Javascript (Promises and beyond)</title>
+
+  <link rel="stylesheet" href="reveal.js-2.1/css/reveal.css">
+  <link rel="stylesheet" href="reveal.js-2.1/css/theme/default.css" id="theme">
+
+  <!-- For syntax highlighting -->
+  <link rel="stylesheet" href="reveal.js-2.1/lib/css/zenburn.css">
+
+  <!-- main css -->
+  <link rel="stylesheet" href="css/main.css">
+
+  <!--[if lt IE 9]>
+  <script src="reveal.js-2.1/lib/js/html5shiv.js"></script>
+  <![endif]-->
+</head>
+
+<body>
+
+<div class="reveal">
+
+<!-- Any section element inside of this container is displayed as a slide -->
+<div class="slides">
+
+<section class="cover">
+  <h1>Asynchronous Javascript</h1>
+
+  <h2>Promises and Beyond</h2>
+</section>
+
+<section>
+  <h2>Outline</h2>
+  <ol>
+    <li>Intro</li>
+    <li>Callbacks</li>
+    <li>Promises</li>
+    <li>Bluebird.js</li>
+    <li>Async/await</li>
+    <li>Event streams</li>
+    <li>Functional Programming</li>
+    <li>Functional Reactive Programming</li>
+    <li>When to use what</li>
+  </ol>
+</section>
+
+<section class="separata">
+  <h2>Intro</h2>
+
+  <h3 style="padding-top: 150px;">So, what's the big deal?</h3>
+</section>
+
+
+<section>
+  <h2>Synchronous code</h2>
+
+  <pre><code contenteditable>
+    // Your typical synchronous code
+    var getQueryResult = function (query) {
+      var result = execQuery(userId);
+      return result;
+    }
+
+    var result = getQueryResult('SELECT ?s WHERE { ?s ?p ?o }');
+    contaner.render(result);
+  </code></pre>
+</section>
+
+<section>
+  <h2>Asynchronous code</h2>
+
+  <pre><code contenteditable>
+    // Both execQuery &amp; getQueryResult are async
+    var getQueryResult = function (query, cb) {
+      execQuery(query, function(res) {
+        res = res.toArray();
+        cb(res);
+      });
+    }
+
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }', function(res) {
+      container.render(res);
+    });
+  </code></pre>
+</section>
+
+<section>
+  <h2>Looks ok, what's the problem?</h2>
+
+  <pre class="fragment"><code contenteditable>
+    var getQueryResult = function (query, cb) {
+      execQuery(query, function(res) {
+        expandResults(res, function(expandedRes) {
+          filterResults(res, function(finalRes){
+            finalRes = finalRes.toArray();
+            cb(finalRes);
+          });
+        });
+      });
+    }
+
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }', function(res) {
+      container.render(res);
+    });
+  </code></pre>
+  <p class="fragment">The Pyramid of Doom</p>
+</section>
+
+<section>
+  <h2>Better asynchronous code</h2>
+  <h4>slightly better?</h4>
+
+  <pre><code contenteditable>
+    var processFinal = function (cb, finalRes){
+      cb(res);
+    }
+    var processExpandedResult = function (cb, expandedRes) {
+      filterResults(res, processFinal.bind(this, cb));
+    }
+    var processQueryResult = function (cb, res) {
+      expandResults(res, processExpandedResult.bind(this, cb));
+    }
+    var getQueryResult = function (query, cb) {
+      execQuery(query, processQueryResult.bind(this, cb));
+    }
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }', function(res) {
+      container.render(res);
+    });
+  </code></pre>
+  <p class="fragment">Still messy</p>
+</section>
+
+<section>
+  <h2>Error handling</h2>
+  <h4>synchronous way</h4>
+
+  <pre><code contenteditable>
+    var getQueryResult = function (query) {
+      var result = execQuery(userId);
+      return result;
+    }
+
+    var result = getQueryResult('SELECT ?s WHERE { ?s ?p ?o }');
+    if(result.error) {
+      return container.error(result.error);
+    }
+    contaner.render(result.data);
+  </code></pre>
+
+</section>
+
+<section>
+  <h2>Error handling</h2>
+  <h4>asynchronous way</h4>
+
+  <pre><code contenteditable>    // Both execQuery &amp; getQueryResult are async
+    var getQueryResult = function (query, cb) {
+      execQuery(query, function(err, res) {
+        if(err) {
+          return cb(err);
+        }
+        res = res.toArray();
+        cb(null, res);
+      });
+    };
+
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }', function(err, res){
+      if(err) {
+        return container.error(err);
+      }
+      container.render(res);
+    });</code></pre>
+</section>
+
+<section>
+  <h2>Callbacks are ...</h2>
+
+  <p>Easy to learn but do not scale very well (get complex very quick)</p>
+</section>
+
+<section class="separata">
+  <hgroup style="padding-top: 200px;">
+    <h2>Promises</h2>
+  </hgroup>
+</section>
+
+<section>
+  <h2>What is a Promise?</h2>
+
+  <ul>
+    <li>Object that provides <code>.then</code> method</li>
+    <li>Promise can be pending, fulfilled or rejected</li>
+    <li><code>.then</code> takes two functions as arguments: onFulfilled, onRejected</li>
+    <li><code>.then</code> must return a promise</li>
+    <li>Promise can be fulfilled only once</li>
+  </ul>
+
+  <p style="padding-top: 50px;">See full spec for Promises/A+ <a href="http://promises-aplus.github.io/promises-spec/">on github</a>.</p>
+</section>
+
+<section>
+  <h2>Accessing the result</h2>
+
+  <pre><code contenteditable>
+    var queryPromise = getQueryResult('SELECT ?s WHERE { ?s ?p ?o }');
+
+    // Some time later
+
+    promisedPic.then(function(res) {
+      container.render(res);
+    });
+  </code></pre>
+
+  <p>It doesn't matter if it has been fulfilled yet or not</p>
+</section>
+
+<section>
+  <h2>Chaining</h2>
+
+  <pre><code contenteditable>
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }')
+    .then(function(res) {
+      return filterResults(res)
+      .then(function(filteredRes) {
+        container.render(filteredRes);
+      });
+    });
+  </code></pre>
+
+</section>
+
+<section>
+  <h2>Chaining</h2>
+  <h4>no such thing as a nested promise</h4>
+
+  <pre><code contenteditable>
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }')
+    .then(function(res) {
+      return filterResults(res);
+    })
+    .then(function(res) {
+      container.render(res);
+    });
+  </code></pre>
+</section>
+
+<section>
+  <h2>Error handling</h2>
+
+  <pre><code contenteditable>
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }')
+        .then(function(res) {
+          return filterResults(res);
+        })
+        .then(function(res) {
+          container.render(res);
+        },
+        function(err) {
+          contaner.error(err);
+        });
+  </code></pre>
+
+  <pre class="fragment"><code contenteditable>
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }')
+    .then(function(res) {
+      return filterResults(res);
+    })
+    .then(function(res) {
+      container.render(res);
+    })
+    .catch(function(err) {
+      container.error(err);
+    });
+  </code></pre>
+</section>
+
+<section>
+  <h2>Promises/A+ libraries</h2>
+
+  <ul>
+    <li>
+      <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">Native Promises</a> - doesn't works everywhere (yet)
+    </li>
+    <li>
+      <a style="text-decoration: underline;" href="https://github.com/petkaantonov/bluebird">Bluebird</a>
+    </li>
+    <li>
+      <a href="http://api.jquery.com/promise/">jQuery Promises</a>
+    </li>
+    <li>
+      <a href="https://github.com/cujojs/when">When.js</a>
+    </li>
+    <li>
+      <a href="https://github.com/kriskowal/q">Q</a>
+    </li>
+    <li>And <a href="http://promisesaplus.com/implementations">a lot more</a></li>
+  </ul>
+</section>
+
+<section class="separata">
+  <h2>Bluebird.js</h2>
+
+  <p style="padding-top: 100px;">Fully featured promise library with focus on innovative features and performance</p>
+</section>
+
+
+<section>
+  <hgroup>
+    <h2>Bluebird features</h2>
+    <h3>the basics</h3>
+  </hgroup>
+
+  <ul>
+    <li>Implements Promises/A+ 2.0.2 (with additional things like progression and cancellation)</li>
+    <li><code>.bind()</code> method that allow currying promises</li>
+    <li>Has collection methods (all, any, map, etc)</li>
+    <li>Has practical debugging solutions such as unhandled rejection reporting, typed catches, catching only what you expect and long stack traces</li>
+    <li><a href="https://github.com/petkaantonov/bluebird">Sick performance</a></li>
+  </ul>
+</section>
+
+<section>
+  <hgroup>
+    <h2>Bluebird features</h2>
+    <h3>awesome stuff</h3>
+  </hgroup>
+
+  <ul>
+    <li>Promise.promisify</li>
+    <li>Promise.promisifyAll</li>
+    <li>Promise.nodeify</li>
+    <li>Promise.coroutine (ES6)</li>
+  </ul>
+</section>
+
+<section>
+  <hgroup>
+    <h2>Promise.promisify</h2>
+  </hgroup>
+
+  <pre><code contenteditable>
+  var readFile = Promise.promisify(require("fs").readFile);
+
+  readFile("myfile.js", "utf8")
+  .then(function(contents){
+      return eval(contents);
+  }).then(function(result){
+      console.log("The result of evaluating myfile.js", result);
+  }).catch(function(e){
+      console.log("Error reading file", e);
+  });
+  </code></pre>
+</section>
+
+<section>
+  <hgroup>
+    <h2>Promise.promisifyAll</h2>
+  </hgroup>
+
+  <pre><code contenteditable>
+  var fs = Promise.promisifyAll(require("fs"));
+
+  fs
+  .readFileAsync("myfile.js", "utf8")
+  .then(function(contents){
+      console.log(contents);
+  }).catch(function(e){
+      console.error(e.stack);
+  });
+  </code></pre>
+</section>
+
+<section>
+  <hgroup>
+    <h2>Promise.nodeify</h2>
+  </hgroup>
+
+  <pre><code contenteditable>
+  function getDataFor(input, callback) {
+    return dataFromDataBase(input).nodeify(callback);
+  }
+  </code></pre>
+</section>
+
+<section class="separata">
+  <hgroup>
+    <h2>Async/await</h2>
+  </hgroup>
+
+  <h3 style="margin-top: 100px;">Turning asynchronous into synchronous</h3>
+</section>
+
+<section>
+  <hgroup>
+    <h2>Generators and yield (ES6)</h2>
+  </hgroup>
+
+  <p><a href="http://taskjs.org/">task.js</a> (Mozilla)</p>
+
+  <pre><code contenteditable>
+  spawn(function*() {
+    var data = yield $.ajax(url);
+    $('#result').html(data);
+    var status = $('#status').html('Download complete.');
+    yield status.fadeIn().promise();
+    yield sleep(2000);
+    status.fadeOut();
+  });
+  </code></pre>
+</section>
+
+<section>
+  <hgroup>
+    <h2>Promise.coroutine (ES6)</h2>
+  </hgroup>
+
+  <pre><code contenteditable>
+  function delay(ms) {
+      return new Promise(function(f){ setTimeout(f, ms); });
+  }
+  function PingPong() {}
+  PingPong.prototype.ping = Promise.coroutine(function* (val) {
+      console.log("Ping?", val)
+      yield delay(500)
+      this.pong(val+1)
+  });
+  PingPong.prototype.pong = Promise.coroutine(function* (val) {
+      console.log("Pong!", val)
+      yield delay(500);
+      this.ping(val+1)
+  });
+  var a = new PingPong();
+  a.ping(0);
+  </code></pre>
+</section>
+
+<section>
+  <h2><a href="https://github.com/yortus/asyncawait">asyncawait</a> (ES5)</h2>
+
+  <p>Built using <a href="https://github.com/laverdet/node-fibers/">node-fibers</a> and Promises.</p>
+
+  <pre><code contenteditable>    var getQueryResult = function (query, cb) {
+      execQuery(query, function(res) {
+        expandResults(res, function(expandedRes) {
+          filterResults(res, function(finalRes){
+            cb(res);
+          });
+        });
+      });
+    }
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }', function(res) {
+      container.render(res);
+    });</code></pre>
+
+  <pre class="fragment"><code contenteditable>  var getQueryResult = async(function(query) {
+    var res = await(execQuery(query));
+    var expandedRes = await(expandResults(res));
+    var finalRes = await(filterResults(res));
+    return finalRes;
+  });
+  getQueryResult('SELECT ?s WHERE { ?s ?p ?o }').then(function(res) {
+    container.render(res);
+  });</code></pre>
+</section>
+
+
+<section class="separata">
+  <hgroup style="padding-top: 200px">
+    <h2>Functional programming</h2>
+  </hgroup>
+</section>
+
+<section>
+  <h2>Composing functions</h2>
+  <h4>synchronous, procedural</h4>
+
+  <pre><code contenteditable>
+    var getQueryResult = function (query) {
+      var res = execQuery(query);
+      finalRes = processResults(res);
+      container.render(finalRes);
+    }
+
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }');
+  </code></pre>
+</section>
+
+<section>
+  <h2>Composing functions</h2>
+  <h4>synchronous, fuctional</h4>
+
+  <pre><code contenteditable>
+    var getQueryResult = compose([
+      execQuery,
+      processResults,
+      container.render.bind(container)
+    ]);
+
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }');
+  </code></pre>
+</section>
+
+<section>
+  <h2>Composing functions</h2>
+  <h4>asynchronous, procedural</h4>
+
+  <pre><code contenteditable>
+    var getQueryResult = function (query, cb) {
+      container.showProgressIndicator();
+      execQuery(query, function(res) {
+        processResults(res, function(finalRes) {
+          container.render(finalRes);
+          cb();
+        });
+      });
+    }
+
+    getQueryResult('SELECT ?s WHERE { ?s ?p ?o }', function() {
+      container.hideProgressIndicator();
+    });
+  </code></pre>
+</section>
+
+<section>
+  <h2>Composing functions</h2>
+  <h4>asynchronous, higher order functions</h4>
+  <pre><code contenteditable>
+  var getQueryResult = composeAsync([
+      perform(container.showProgressIndicator.bind(container)),
+      execQuery,
+      processResults,
+      perform(container.render.bind(ui))
+  ]);
+  getQueryResult('SELECT ?s WHERE { ?s ?p ?o }',
+    container.hideProgressIndicator.bind(container));
+  </code></pre>
+  <pre class="fragment"><code contenteditable>
+  var getQueryResult = compose([
+    execQuery,
+    processResults,
+    container.render.bind(container)
+  ]);
+  </code></pre>
+  <p class="fragment">Same structure as sync</p>
+  <p class="fragment">No need to change paradigm</p>
+</section>
+
+<section>
+  <h2>Syntax sugar</h2>
+  <h4>a matter of taste</h4>
+
+  <pre><code contenteditable>
+    // If you like jQuery or promises chains
+    var getQueryResult =
+        perform(container.showProgressIndicator.bind(container))
+            .map(execQuery)
+            .map(processResults)
+            .perform(container.render.bind(container));
+
+    getQueryResult
+        .perform(container.hideProgressIndicator.bind(container))
+        ('SELECT ?s WHERE { ?s ?p ?o }');
+  </code></pre>
+</section>
+
+<section>
+  <h2>Frameworks</h2>
+
+  <p><a href="https://github.com/caolan/async">Async.JS</a></p>
+</section>
+
+<section>
+  <h2>Composing with Async</h2>
+
+  <pre><code contenteditable>
+  // Reversed order
+  var getQueryResult = async.compose(
+      execQuery,
+      processResults,
+      // perform not in Async
+      perform(container.showProgressIndicator.bind(container))
+  );
+  getQueryResult('SELECT ?s WHERE { ?s ?p ?o }', function (err, pic) {
+    // Node convention
+    if(err) {
+      return container.showError(err);
+    }
+    container.render(pic);
+  });
+  </code></pre>
+</section>
+
+<section>
+  <h2>Async has almost everything you might need</h2>
+  <ul>
+    <li>Transform & Filter</li>
+    <li>Temporal logic</li>
+    <li>Synchronization</li>
+    <li>Merging</li>
+    <li>Grouping</li>
+    <li>Unwrapping streams of streams</li>
+    <li><a href="https://github.com/caolan/async">And more...</a></li>
+  </ul>
+</section>
+
+
+<section class="separata">
+  <h2>(Node) Event streams</h2>
+  <h3 style="padding-top: 100px;">IO everywhere</h3>
+</section>
+
+<section>
+  <h2>Node streams</h2>
+  <h4>efficient IO</h4>
+
+  <pre><code contenteditable>
+    // Streams are EventEmitters
+    dataStream.on('data', function(data) {
+      // Consume data chunk
+    });
+    dataStream.on('error', function(err) {
+      // Handle errors
+    });
+    dataStream.on('end', function() {
+      // No more data, stream ended
+    });
+    // With a pipe method
+    dataStream.pipe(compressor('zip')).pipe(res);
+  </code></pre>
+  <p class="fragment">Want to know more? <a
+          href="https://github.com/substack/stream-handbook">Stream Handbook</a></p>
+</section>
+
+<section>
+  <h2>Event Streams</h2>
+
+  <ul>
+    <li><i>Readable streams</i> are event sources</li>
+    <li><i>Writable streams</i> are side effects</li>
+    <li><i>Through streams</i> are async transformations</li>
+  </ul>
+
+  <p style="padding-top: 50px;"><a href="https://github.com/dominictarr/event-stream">Event-stream</a> project</p>
+
+</section>
+
+<section>
+  <h2>Live querying with Event Streams</h2>
+  <h4>simplified version</h4>
+
+  <pre><code contenteditable>
+  var es = require('event-stream');
+  var domstream = require('domnode-dom');
+  var queryStream = es.pipeline(
+      domstream.createReadStream('input.search', 'keyup'),
+      es.mapSync(trim),
+      es.mapSync(toLowerCase),
+      es.mapSync(function(text) {
+        container.showProgressIndicator();
+        return text;
+      }),
+      es.map(getQueryResult),
+  );
+  queryStream.on('data', container.render.bind(container));
+  queryStream.on('error', container.error.bind(container));
+  queryStream.on('end', container.hideProgressIndicator.bind(container));
+  </code></pre>
+</section>
+
+<section>
+  <h2>Strong points</h2>
+  <ul>
+    <li>Compatible with all node streams libs</li>
+    <li>Easy to extend</li>
+    <li>A lot of different streams out there</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Weak points</h2>
+  <ul>
+    <li>Node centric</li>
+    <li>Need to use Browserify or similar</li>
+    <li>More docs!</li>
+  </ul>
+</section>
+
+<section class="separata">
+  <hgroup style="padding-top: 200px;">
+    <h2>(Functional) Reactive Programming</h2>
+  </hgroup>
+</section>
+
+<section>
+  <h2>The best of both worlds</h2>
+
+  <ul>
+    <li>Data Source = Streams + FP tools</li>
+    <li>First citizen objects</li>
+    <li>Coherent set of operations</li>
+    <li>Coherent language</li>
+    <li>Chainable &amp; composable (Promise like)</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Two kinds of Data Sources</h2>
+  <h4>1. Data sequences</h4>
+
+  <ul>
+    <li>Have memory (Promise like)</li>
+    <li>Remember N last values</li>
+    <li>Replay N last values</li>
+    <li>Useful for data processing & event sourcing</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Two kinds of Data Sources</h2>
+  <h4>2. Event streams</h4>
+
+  <ul>
+    <li>Do not have memory</li>
+    <li>Useful when we don't care about past info</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Promises VS. FRP</h2>
+
+  <ul>
+    <li>Property: data sequence that remembers only the last value</li>
+    <li>Promise: a property with only one single value or event</li>
+    <li>Promises are a subset of FRP</li>
+  </ul>
+</section>
+
+<section>
+  <h2><a href="https://github.com/Reactive-Extensions">RX</a></h2>
+  <h4>from Microsoft</h4>
+
+  <ul>
+    <li>Bridges with some of the existing tech</li>
+    <li>Medium weight (12 KB min+gzip)</li>
+    <li>LINQ centric</li>
+    <li>Have its own "language"</li>
+    <li>Apache License & Microsoft Open Technologies</li>
+  </ul>
+
+  <p class="fragment" style="padding-top: 50px;"><a href="https://www.youtube.com/watch?v=XRYN2xt11Ek">Netflix - Async JavaScript with Reactive Extensions</a></p>
+</section>
+
+<section>
+  <h2><a href="https://github.com/raimohanska/bacon.js">Bacon</a></h2>
+
+  <ul>
+    <li>Made for JS ™</li>
+    <li>Node &amp; Browser</li>
+    <li>Lightweight (5 KB min+zip)</li>
+    <li>Not as big as RX, very focused</li>
+    <li>Only bridges with jQuery/Zepto</li>
+    <li>Event Streams &amp; Properties</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Live Querying with Bacon.JS</h2>
+  <h4>simplified version</h4>
+
+  <pre><code contenteditable>
+  var searchText = $('input[type="text"][name="search"]')
+    .asEventStream('keyup')
+    .map(".target.value")
+    .map(trimText)
+    .toProperty(""); // memory !
+
+  searchText
+    .sample(500)
+    .skipDuplicates()
+    .filter(shorterThan(3))
+    .map(getQueryResult)
+    .onValue(function (res) {
+      search.on('data', container.appendResult.bind(container));
+      search.on('end', container.end.bind(container));
+    });
+  </code></pre>
+</section>
+
+<section class="separata">
+  <hgroup style="padding-top: 200px;">
+    <h2>When to use what?</h2>
+  </hgroup>
+</section>
+
+<section>
+  <h2>General rule!</h2>
+
+  <h3 style="padding-top: 20px;">K.I.S.S.</h3>
+
+  <p class="fragment">Use <em>the most simple tool</em> that can solve your problem.</p>
+</section>
+
+<section>
+  <h2>When to use Callbacks</h2>
+  <h4>simple logic</h4>
+  <ul>
+    <li>Simple async logic: at most 2 async transformations.</li>
+    <li>No time to learn anything more complex.</li>
+    <li>Small code base or proof of concepts.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>When to use Promises</h2>
+  <ul>
+    <li>There's need to chain async processes</li>
+    <li>No need to use fancy incremental processing</li>
+  </ul>
+</section>
+
+<section>
+  <h2>When to use FP or FRP</h2>
+  <h4>when promises are not enough</h4>
+  <ul>
+    <li>In use cases when promises don't help</li>
+    <li>Incremental processing, UI logic, etc.</li>
+  </ul>
+</section>
+
+<section class="separata">
+  <hgroup>
+    <h1>Thank you!</h1>
+  </hgroup>
+
+  <h2>Questions?</h2>
+</section>
+
+</div>
+
+</div>
+
+
+<script src="reveal.js-2.1/lib/js/head.min.js"></script>
+<script src="reveal.js-2.1/js/reveal.min.js"></script>
+
+<script>
+
+  // Full list of configuration options available here:
+  // https://github.com/hakimel/reveal.js#configuration
+  Reveal.initialize({
+    controls:true,
+    progress:true,
+    history:true,
+
+    theme:Reveal.getQueryHash().theme, // available themes are in /css/theme
+    transition:Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/none
+
+    // Optional libraries used to extend on reveal.js
+    dependencies:[
+      { src:'reveal.js-2.1/lib/js/classList.js', condition:function () {
+        return !document.body.classList;
+      } },
+      { src:'reveal.js-2.1/plugin/markdown/showdown.js', condition:function () {
+        return !!document.querySelector('[data-markdown]');
+      } },
+      { src:'reveal.js-2.1/plugin/markdown/markdown.js', condition:function () {
+        return !!document.querySelector('[data-markdown]');
+      } },
+      { src:'reveal.js-2.1/plugin/highlight/highlight.js', async:true, callback:function () {
+        hljs.initHighlightingOnLoad();
+      } },
+      { src:'reveal.js-2.1/plugin/zoom-js/zoom.js', async:true, condition:function () {
+        return !!document.body.classList;
+      } },
+      { src:'reveal.js-2.1/plugin/notes/notes.js', async:true, condition:function () {
+        return !!document.body.classList;
+      } }
+    ]
+  });
+
+</script>
+
+</body>
+</html>

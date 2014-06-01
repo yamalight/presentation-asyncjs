@@ -1,0 +1,171 @@
+/* Aside */
+.left {
+float: left;
+}
+
+img.left {
+margin: 0;
+padding: 0;
+width: 25%;
+}
+
+img.left + ul {
+margin: 0;
+width: 60%;
+}
+
+/* Figures with captions */
+.reveal section figure {
+position: relative;
+margin: 0 auto;
+padding:0;
+width: 600px;
+height: 400px;
+text-align: center;
+overflow: hidden;
+}
+
+.reveal section figure > img {
+width: 100%;
+max-height: none;
+border-style: none;
+margin: 0;
+padding: 0;
+}
+
+.reveal section figure > figcaption {
+position: absolute;
+bottom: 0.5em;
+left: 0;
+width: 100%;
+border-style: none;
+border-width: 0;
+margin: 0;
+padding: 0;
+background-color: rgb(37, 33, 28);
+background-color: rgba(37, 33, 28, 0.5);
+font-size: 0.4em;
+text-align: center;
+}
+
+.reveal section figure > figcaption {
+line-height: 1.5em;
+vertical-align: middle;
+}
+
+.reveal section figure > figcaption a {
+line-height: 1.5em !important;
+}
+
+/* Cover */
+.reveal section.cover footer {
+line-height: 33px;
+clear: both;
+}
+
+.reveal section.cover > footer {
+position: absolute;
+bottom: 0.5em;
+left: 0;
+border-style: none;
+border-width: 0;
+margin: 0;
+padding: 0;
+width: 100%;
+background-color: rgb(37, 33, 28);
+background-color: rgba(37, 33, 28, 0.5);
+font-size: 0.4em;
+text-align: center;
+}
+
+.reveal section.cover footer img {
+float: left;
+margin: 0 1em 0 0;
+padding: 0;
+cursor: pointer;
+border-style: none;
+}
+
+.reveal section.cover footer a,
+.reveal section.cover footer span {
+margin: 0;
+padding: 0;
+vertical-align: baseline;
+line-height: 33px;
+}
+
+/* Separata */
+.reveal section.separata hgroup {
+margin-top: 0.5em;
+}
+
+.reveal section.separata hgroup h2,
+.reveal section.separata hgroup h3,
+.reveal section.separata hgroup h4 {
+color: #F0F1EB;
+text-shadow: #111150 0px 0px 0.2em;
+}
+
+.reveal section.separata figure {
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+margin: 0;
+padding: 0;
+}
+
+.reveal section.separata figure > img {
+position: absolute;
+top: 0;
+left: 0;
+border-style: none;
+border-width: 0;
+margin: 0;
+padding: 0;
+width: 100%;
+z-index: -1;
+}
+
+/* Animation */
+div.animation-container {
+position: relative;
+margin: 0 auto;
+padding: 0;
+width: 809px;
+height: 399px;
+background-color: transparent;
+-moz-box-shadow: rgba(0, 0, 0, 0.3) 0px 0px 6px 0px;
+-webkit-box-shadow: rgba(0, 0, 0, 0.3) 0px 0px 6px 0px;
+box-shadow: rgba(0, 0, 0, 0.3) 0px 0px 6px 0px;
+overflow: hidden;
+}
+
+.animation-container .frame,
+.animation-container .frame > img {
+position: absolute;
+top:0;
+left: 0;
+border: 0;
+border-style: none;
+padding: 0;
+margin: 0;
+min-width: 100%;
+max-width: none;
+max-height: none;
+box-shadow: none
+}
+
+.animation-container .frame > img.loader {
+position: absolute;
+top:140px;
+left: 180px;
+border: 0;
+border-style: none;
+padding: 0;
+margin: 0;
+width: 126px;
+min-width: 126px;
+box-shadow: none;
+}
