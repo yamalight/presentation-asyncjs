@@ -152,7 +152,7 @@ Partially based on http://github.io/eamodeorubio/tamingasync/
     if(result.error) {
       return container.error(result.error);
     }
-    contaner.render(result.data);
+    container.render(result.data);
   </code></pre>
 
 </section>
@@ -660,7 +660,7 @@ Partially based on http://github.io/eamodeorubio/tamingasync/
   var es = require('event-stream');
   var domstream = require('domnode-dom');
   var queryStream = es.pipeline(
-      domstream.createReadStream('input.search', 'keyup'),
+      domstream.createReadStream('input.query', 'keyup'),
       es.mapSync(trim),
       es.mapSync(toLowerCase),
       es.mapSync(function(text) {
@@ -776,20 +776,20 @@ Partially based on http://github.io/eamodeorubio/tamingasync/
   <h4>simplified version</h4>
 
   <pre><code contenteditable>
-  var searchText = $('input[type="text"][name="search"]')
+  var queryText = $('input[type="text"][name="query"]')
     .asEventStream('keyup')
     .map(".target.value")
     .map(trimText)
     .toProperty(""); // memory !
 
-  searchText
+  queryText
     .sample(500)
     .skipDuplicates()
     .filter(shorterThan(3))
     .map(getQueryResult)
     .onValue(function (res) {
-      search.on('data', container.appendResult.bind(container));
-      search.on('end', container.end.bind(container));
+      queryText.on('data', container.appendResult.bind(container));
+      queryText.on('end', container.end.bind(container));
     });
   </code></pre>
 </section>
