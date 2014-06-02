@@ -537,7 +537,7 @@ Partially based on http://github.io/eamodeorubio/tamingasync/
       perform(container.showProgressIndicator.bind(container)),
       execQuery,
       processResults,
-      perform(container.render.bind(ui))
+      perform(container.render.bind(container))
   ]);
   getQueryResult('SELECT ?s WHERE { ?s ?p ?o }',
     container.hideProgressIndicator.bind(container));
@@ -738,7 +738,7 @@ Partially based on http://github.io/eamodeorubio/tamingasync/
 
   <ul>
     <li>Property: data sequence that remembers only the last value</li>
-    <li>Promise: a property with only one single value or event</li>
+    <li>Promise: a property with only one single value and event</li>
     <li>Promises are a subset of FRP</li>
   </ul>
 </section>
